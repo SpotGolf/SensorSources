@@ -1,0 +1,72 @@
+#!/bin/bash
+# Sends clips and controls to an app's mock sensors on a simulator.
+#
+#   sensor-mock <device> <bundle id> play <name>.clip    play a clip folder once
+#   sensor-mock <device> <bundle id> set <sensor> <mode>  sensor: accelerometer, deviceMotion, microphone
+#                                                         mode: ok, fail, silent, zeros
+#   sensor-mock <device> <bundle id> reset                every sensor back to ok
+#
+# The device is a simulator name or UDID, and must be booted with the app installed. Files go
+# to Library/SensorMock/Inbox in the app's data container, copied to a hidden name first and
+# then renamed, so the app never reads a half-written file.
+set -euo pipefail
+
+usage() {
+  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+  exit 2
+}
+
+[ $# -ge 3 ] || usage
+device=$1 bundle=$2 command=$3
+shift 3
+
+container=$(xcrun simctl get_app_container "$device" "$bundle" data)
+inbox="$container/Library/SensorMock/Inbox"
+mkdir -p "$inbox"
+control="$inbox/control.json"
+
+# Writes control.json with `sensor` set to `mode`, keeping the other sensors' modes
+set_mode() {
+  /usr/bin/python3 -I - "$control" "$1" "$2" <<'PY'
+import json, os, sys
+path, sensor, mode = sys.argv[1:]
+sensors = {"accelerometer", "deviceMotion", "microphone"}
+modes = {"ok", "fail", "silent", "zeros"}
+if sensor not in sensors or mode not in modes:
+    sys.exit(f"sensor must be one of {sorted(sensors)} and mode one of {sorted(modes)}")
+try:
+    with open(path) as f:
+        current = json.load(f)
+except (FileNotFoundError, ValueError):
+    current = {}
+current[sensor] = mode
+temp = os.path.join(os.path.dirname(path), ".control.json")
+with open(temp, "w") as f:
+    json.dump(current, f)
+os.replace(temp, path)
+PY
+}
+
+case $command in
+  play)
+    [ $# -eq 1 ] && [ -d "$1" ] || usage
+    name=$(basename "$1")
+    case $name in *.clip) ;; *) name="$name.clip" ;; esac
+    rm -rf "$inbox/.$name"
+    cp -R "$1" "$inbox/.$name"
+    mv "$inbox/.$name" "$inbox/$name"
+    echo "Playing $name"
+    ;;
+  set)
+    [ $# -eq 2 ] || usage
+    set_mode "$1" "$2"
+    echo "$1: $2"
+    ;;
+  reset)
+    rm -f "$control"
+    echo "Every sensor: ok"
+    ;;
+  *)
+    usage
+    ;;
+esac
