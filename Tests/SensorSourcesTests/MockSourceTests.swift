@@ -2,19 +2,29 @@ import XCTest
 @testable import SensorSources
 
 final class MockSourceTests: XCTestCase {
-    func testAccelerometerBaselineIsAtRestAt800Hz() {
+    func testAccelerometerBaselineIsAtRestAtTheLiveRate() {
         let batch = MockAccelerometer.samples(from: 10, to: 11, mode: .ok, clips: [])
 
-        XCTAssertEqual(batch.count, 800)
+        #if os(watchOS)
+        XCTAssertEqual(MockAccelerometer.rate, 800)
+        #else
+        XCTAssertEqual(MockAccelerometer.rate, PhoneAccelerometer.rate)
+        #endif
+        XCTAssertEqual(batch.count, Int(MockAccelerometer.rate))
         XCTAssertEqual(batch.first!.timestamp, 10, accuracy: 1e-9)
         XCTAssertTrue(SensorHealth.isReal(batch))
         XCTAssertEqual(batch.map(\.acceleration.magnitude).max()!, 1, accuracy: 0.05)
     }
 
-    func testDeviceMotionBaselineIsRealAt200Hz() {
+    func testDeviceMotionBaselineIsRealAtTheLiveRate() {
         let batch = MockDeviceMotion.samples(from: 10, to: 11, mode: .ok, clips: [])
 
-        XCTAssertEqual(batch.count, 200)
+        #if os(watchOS)
+        XCTAssertEqual(MockDeviceMotion.rate, 200)
+        #else
+        XCTAssertEqual(MockDeviceMotion.rate, PhoneDeviceMotion.rate)
+        #endif
+        XCTAssertEqual(batch.count, Int(MockDeviceMotion.rate))
         XCTAssertTrue(SensorHealth.isReal(batch))
     }
 
@@ -191,5 +201,18 @@ final class ExampleClipTests: XCTestCase {
         let clip = try MockClip(folder: Self.examples.appendingPathComponent("chip.clip"))
 
         XCTAssertGreaterThan(clip.accelerometer.map(\.acceleration.magnitude).max()!, 13)
+    }
+}
+
+final class MotionBatchTests: XCTestCase {
+    func testReadingsAreHandedOutOnceTheySpanTheInterval() {
+        let batch = MotionBatch<Int>(interval: 1)
+
+        for index in 0..<100 {
+            XCTAssertNil(batch.add(index, at: 10 + Double(index) / 100))
+        }
+        XCTAssertEqual(batch.add(100, at: 11), Array(0...100))
+        XCTAssertNil(batch.add(101, at: 11.01), "the next batch starts empty")
+        XCTAssertEqual(batch.add(102, at: 12.01), [101, 102])
     }
 }

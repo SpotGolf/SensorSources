@@ -66,8 +66,14 @@ public struct SensorSet {
         #endif
     }
 
+    /// The watch's batched sensors on watchOS, and `CMMotionManager` sensors on a phone, which
+    /// has no batched sensors.
     public static func live() -> SensorSet {
+        #if os(watchOS)
         SensorSet(accelerometer: LiveAccelerometer(), deviceMotion: LiveDeviceMotion(), microphone: LiveMicrophone())
+        #else
+        SensorSet(accelerometer: PhoneAccelerometer(), deviceMotion: PhoneDeviceMotion(), microphone: LiveMicrophone())
+        #endif
     }
 
     /// Mock sources reading clips and controls from `hub`'s inbox.

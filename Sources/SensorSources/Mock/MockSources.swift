@@ -83,9 +83,14 @@ public class MockSource<Sample: Sendable> {
     }
 }
 
-/// An accelerometer at rest, 800 Hz, a batch a second, with any clip's readings in place of it.
+/// An accelerometer at rest at the live rate, 800 Hz on a watch and 100 Hz on a phone, a batch
+/// a second, with any clip's readings in place of it.
 public final class MockAccelerometer: MockSource<AccelerometerSample>, AccelerometerSource {
+    #if os(watchOS)
     public nonisolated static let rate: Double = 800
+    #else
+    public nonisolated static let rate: Double = PhoneAccelerometer.rate
+    #endif
 
     public init(hub: MockSensorHub = .shared) {
         super.init(hub: hub, sensor: .accelerometer, interval: 1)
@@ -112,9 +117,14 @@ public final class MockAccelerometer: MockSource<AccelerometerSample>, Accelerom
     }
 }
 
-/// Device motion at rest, 200 Hz, a batch a second, with any clip's readings in place of it.
+/// Device motion at rest at the live rate, 200 Hz on a watch and 100 Hz on a phone, a batch a
+/// second, with any clip's readings in place of it.
 public final class MockDeviceMotion: MockSource<DeviceMotionSample>, DeviceMotionSource {
+    #if os(watchOS)
     public nonisolated static let rate: Double = 200
+    #else
+    public nonisolated static let rate: Double = PhoneDeviceMotion.rate
+    #endif
 
     public init(hub: MockSensorHub = .shared) {
         super.init(hub: hub, sensor: .deviceMotion, interval: 1)

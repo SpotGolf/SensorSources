@@ -1,18 +1,21 @@
 #!/bin/bash
 # Sends clips and controls to an app's mock sensors on a simulator.
 #
-#   sensor-mock <device> <bundle id> play <name>.clip    play a clip folder once
+#   sensor-mock <device> <bundle id> play <name>.clip [--at SECONDS]
+#                                                         play a clip folder once, when it is picked
+#                                                         up or at SECONDS since 1970
 #   sensor-mock <device> <bundle id> set <sensor> <mode>  sensor: accelerometer, deviceMotion, microphone
 #                                                         mode: ok, fail, silent, zeros
 #   sensor-mock <device> <bundle id> reset                every sensor back to ok
 #
 # The device is a simulator name or UDID, and must be booted with the app installed. Files go
 # to Library/SensorMock/Inbox in the app's data container, copied to a hidden name first and
-# then renamed, so the app never reads a half-written file.
+# then renamed, so the app never reads a half-written file. With --at, the clip is sent with a
+# clip.json holding that start time, so clips sent to several simulators start together.
 set -euo pipefail
 
 usage() {
-  sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 }
 
@@ -49,13 +52,25 @@ PY
 
 case $command in
   play)
-    [ $# -eq 1 ] && [ -d "$1" ] || usage
+    [ $# -eq 1 ] || [ $# -eq 3 ] && [ -d "$1" ] || usage
+    start_at=
+    if [ $# -eq 3 ]; then
+      [ "$2" = --at ] && [[ $3 =~ ^[0-9]+(\.[0-9]+)?$ ]] || usage
+      start_at=$3
+    fi
     name=$(basename "$1")
     case $name in *.clip) ;; *) name="$name.clip" ;; esac
     rm -rf "$inbox/.$name"
     cp -R "$1" "$inbox/.$name"
+    if [ -n "$start_at" ]; then
+      echo "{\"startAt\": $start_at}" > "$inbox/.$name/clip.json"
+    fi
     mv "$inbox/.$name" "$inbox/$name"
-    echo "Playing $name"
+    if [ -n "$start_at" ]; then
+      echo "Playing $name at $start_at"
+    else
+      echo "Playing $name"
+    fi
     ;;
   set)
     [ $# -eq 2 ] || usage
