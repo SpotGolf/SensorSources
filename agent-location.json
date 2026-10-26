@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "organizationId": "02b55325-b929-4d6c-897c-acd0d1bbb403",
+  "missionTypes": [
+    "swift",
+    "library"
+  ],
+  "agentTypes": []
+}

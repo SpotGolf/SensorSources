@@ -57,6 +57,21 @@ final class Sensors {
         })
     }
 
+    func startDeviceMotion() throws {
+        try sources.deviceMotion.start(onSamples: { batch in
+            guard SensorHealth.isReal(batch) else { return }
+            // rotationRate in radians a second; userAcceleration in g, gravity removed
+            let fastestSpin = batch.map(\.rotationRate.magnitude).max() ?? 0
+            let hardestPush = batch.map(\.userAcceleration.magnitude).max() ?? 0
+            if let last = batch.last {
+                // gravity points down in the device's frame; attitude is a unit quaternion
+                print("spin \(fastestSpin) rad/s, push \(hardestPush) g, gravity \(last.gravity), attitude \(last.attitude)")
+            }
+        }, onError: { error in
+            print("Device motion error: \(error)")
+        })
+    }
+
     func startMicrophone() throws {
         try sources.microphone.start(onSamples: { buffers in
             for buffer in buffers {
